@@ -3,27 +3,16 @@
 #include "huggingface_common.hpp"
 #include "huggingface_extension.hpp"
 
-#include "duckdb/common/exception.hpp"
-#include "duckdb/main/config.hpp"
-#include "duckdb/main/connection.hpp"
+#include "cache_httpfs_config.hpp"
 
 namespace duckdb {
 
 namespace {
 
+// Use in-memory cache for Huggingface access.
 void DisablePersistentCache(ExtensionLoader &loader) {
 	auto &instance = loader.GetDatabaseInstance();
-	auto &config = DBConfig::GetConfig(instance);
-	ExtensionOption cache_type;
-	if (!config.TryGetExtensionOption("cache_httpfs_type", cache_type)) {
-		throw InternalException("cache_httpfs_type setting is unavailable; cache_httpfs must load before huggingface");
-	}
-
-	Connection connection(instance);
-	auto result = connection.Query("SET GLOBAL cache_httpfs_type = 'in_mem'");
-	if (result->HasError()) {
-		throw InternalException("Failed to disable persistent cache_httpfs caching: %s", result->GetError());
-	}
+	SetCacheHttpfsExtensionOption(instance, "cache_httpfs_type", Value("in_mem"));
 }
 
 void LoadInternal(ExtensionLoader &loader) {
