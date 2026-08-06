@@ -1,6 +1,9 @@
 # DuckDB Hugging Face
 
-A DuckDB extension for discovering, inspecting, profiling, and querying Parquet datasets on the Hugging Face Hub.
+A utility extension for understanding datasets on the Hugging Face Hub directly from DuckDB. It helps users discover
+Parquet files, inspect dataset structure, profile metadata, query records, and estimate external-blob storage before
+building a larger ingestion or processing pipeline.
+
 It uses cache_httpfs, which wraps DuckDB HTTPFS and its `hf://` filesystem with remote-read caching, while retaining
 Parquet projection and filter pushdown.
 
