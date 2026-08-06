@@ -1,7 +1,14 @@
 # This file is included by DuckDB's build system. It specifies which extension to load
 
 # Extension from this repo
-duckdb_extension_load(waddle
+duckdb_extension_load(json)
+duckdb_extension_load(parquet)
+duckdb_extension_load(httpfs
+    GIT_URL https://github.com/duckdb/duckdb-httpfs
+    GIT_TAG c3f215ab360f04dc3d3d5305fa81849c0121f111
+)
+
+duckdb_extension_load(huggingface
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
 )
 
