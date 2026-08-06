@@ -2,7 +2,7 @@
 # description: test Hugging Face extension
 # group: [sql]
 
-require httpfs
+require cache_httpfs
 
 require parquet
 

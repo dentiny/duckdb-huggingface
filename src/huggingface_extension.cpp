@@ -8,7 +8,7 @@ namespace duckdb {
 namespace {
 
 void LoadInternal(ExtensionLoader &loader) {
-	loader.SetDescription("Discover and query Hugging Face datasets through DuckDB HTTPFS");
+	loader.SetDescription("Discover and query Hugging Face datasets through cache_httpfs");
 	RegisterHFFiles(loader);
 	RegisterHFScan(loader);
 	RegisterHFSchema(loader);

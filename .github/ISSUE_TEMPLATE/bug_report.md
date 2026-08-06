@@ -22,7 +22,7 @@ Describe the problem clearly and concisely.
 Provide the smallest SQL or code sample that reproduces the issue:
 
 ```sql
-LOAD httpfs;
+LOAD cache_httpfs;
 LOAD huggingface;
 
 -- Reproduction
