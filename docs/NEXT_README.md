@@ -45,6 +45,31 @@ FROM hf_scan(
 It does not include objects referenced only by external URLs. For example, MINT-1T-HTML stores image URLs rather
 than image bytes, so those remote images are not part of its Parquet size.
 
+Use `hf_dataset_size` to include external blobs referenced by a `VARCHAR[]` column. Blob URLs are deduplicated and
+resolved concurrently; `blob_concurrency` defaults to 32 and accepts values from 1 to 256.
+
+```sql
+FROM hf_dataset_size(
+    'mlfoundations/MINT-1T-HTML',
+    blob_column = 'images',
+    blob_concurrency = 64
+);
+```
+
+For user-provided Parquet files, pass a list to `parquet_dataset_size`:
+
+```sql
+FROM parquet_dataset_size(
+    ['part-0000.parquet', 'part-0001.parquet'],
+    blob_column = 'images',
+    blob_concurrency = 64
+);
+```
+
+The result separates `parquet_size_bytes`, `external_blob_size_bytes`, and `unresolved_blob_count`.
+`overall_size_bytes` is `NULL` unless every external blob size was resolved; `known_overall_size_bytes` is always
+the sum of known storage.
+
 `hf_scan` delegates execution to DuckDB HTTPFS and the Parquet scanner, preserving Hugging Face authentication, revision handling, globbing, projection pushdown, and filter pushdown. The default revision is Hugging Face's auto-converted `~parquet` branch. Use DuckDB's Hugging Face secret for private or gated datasets:
 
 ```sql
