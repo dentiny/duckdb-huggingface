@@ -53,28 +53,27 @@ string BuildDatasetSizeQuery(const string &files, const string &scan, const stri
                              idx_t blob_concurrency) {
 	auto column = KeywordHelper::WriteQuoted(blob_column, '"');
 	auto concurrency = Value::UBIGINT(blob_concurrency).ToSQLString();
-	return StringUtil::Format(
-	    "WITH parquet_stats AS ("
-	    "SELECT count(*)::UBIGINT AS parquet_file_count, "
-	    "coalesce(sum(file_size_bytes), 0)::HUGEINT AS parquet_size_bytes "
-	    "FROM parquet_file_metadata(%s)"
-	    "), blob_urls AS ("
-	    "SELECT DISTINCT url FROM (SELECT unnest(%s)::VARCHAR AS url FROM %s) "
-	    "WHERE url IS NOT NULL AND url <> ''"
-	    "), blob_sizes AS ("
-	    "SELECT url, hf_blob_size(url, %s) AS size_bytes FROM blob_urls"
-	    "), blob_stats AS ("
-	    "SELECT count(*)::UBIGINT AS external_blob_count, "
-	    "coalesce(sum(size_bytes), 0)::HUGEINT AS external_blob_size_bytes, "
-	    "count(*) FILTER (WHERE size_bytes IS NULL)::UBIGINT AS unresolved_blob_count "
-	    "FROM blob_sizes"
-	    ") SELECT parquet_file_count, parquet_size_bytes, external_blob_count, "
-	    "external_blob_size_bytes, unresolved_blob_count, "
-	    "parquet_size_bytes + external_blob_size_bytes AS known_overall_size_bytes, "
-	    "CASE WHEN unresolved_blob_count = 0 "
-	    "THEN parquet_size_bytes + external_blob_size_bytes END AS overall_size_bytes "
-	    "FROM parquet_stats CROSS JOIN blob_stats",
-	    files, column, scan, concurrency);
+	return StringUtil::Format("WITH parquet_stats AS ("
+	                          "SELECT count(*)::UBIGINT AS parquet_file_count, "
+	                          "coalesce(sum(file_size_bytes), 0)::HUGEINT AS parquet_size_bytes "
+	                          "FROM parquet_file_metadata(%s)"
+	                          "), blob_urls AS ("
+	                          "SELECT DISTINCT url FROM (SELECT unnest(%s)::VARCHAR AS url FROM %s) "
+	                          "WHERE url IS NOT NULL AND url <> ''"
+	                          "), blob_sizes AS ("
+	                          "SELECT url, hf_blob_size(url, %s) AS size_bytes FROM blob_urls"
+	                          "), blob_stats AS ("
+	                          "SELECT count(*)::UBIGINT AS external_blob_count, "
+	                          "coalesce(sum(size_bytes), 0)::HUGEINT AS external_blob_size_bytes, "
+	                          "count(*) FILTER (WHERE size_bytes IS NULL)::UBIGINT AS unresolved_blob_count "
+	                          "FROM blob_sizes"
+	                          ") SELECT parquet_file_count, parquet_size_bytes, external_blob_count, "
+	                          "external_blob_size_bytes, unresolved_blob_count, "
+	                          "parquet_size_bytes + external_blob_size_bytes AS known_overall_size_bytes, "
+	                          "CASE WHEN unresolved_blob_count = 0 "
+	                          "THEN parquet_size_bytes + external_blob_size_bytes END AS overall_size_bytes "
+	                          "FROM parquet_stats CROSS JOIN blob_stats",
+	                          files, column, scan, concurrency);
 }
 
 string HFCall(const string &function_name, const HuggingFaceOptions &options) {
@@ -165,9 +164,8 @@ void AddBlobParameters(TableFunction &function) {
 } // namespace
 
 void RegisterHFDatasetSize(ExtensionLoader &loader) {
-	loader.RegisterFunction(
-	    ScalarFunction("hf_blob_size", {LogicalType::VARCHAR, LogicalType::UBIGINT}, LogicalType::BIGINT,
-	                   HFBlobSizeFunction));
+	loader.RegisterFunction(ScalarFunction("hf_blob_size", {LogicalType::VARCHAR, LogicalType::UBIGINT},
+	                                       LogicalType::BIGINT, HFBlobSizeFunction));
 
 	TableFunction hf_dataset_size("hf_dataset_size", {LogicalType::VARCHAR}, nullptr, nullptr);
 	hf_dataset_size.named_parameters["revision"] = LogicalType::VARCHAR;

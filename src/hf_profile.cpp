@@ -19,14 +19,14 @@ unique_ptr<TableRef> HFProfileBindReplace(ClientContext &context, TableFunctionB
 	auto options = HuggingFaceOptions::Parse(input);
 	auto config = options.config.empty() ? "*" : options.config;
 	auto split = options.split.empty() ? "*" : options.split;
-	auto query = StringUtil::Format(
-	    "SELECT %s AS repository, %s AS revision, %s AS config, %s AS split, "
-	    "count(*)::UBIGINT AS file_count, sum(num_rows)::HUGEINT AS total_rows, "
-	    "sum(num_row_groups)::HUGEINT AS total_row_groups, "
-	    "sum(file_size_bytes)::HUGEINT AS total_file_size_bytes "
-	    "FROM parquet_file_metadata(%s)",
-	    Value(options.repository).ToSQLString(), Value(options.revision).ToSQLString(), Value(config).ToSQLString(),
-	    Value(split).ToSQLString(), Value(options.Pattern()).ToSQLString());
+	auto query = StringUtil::Format("SELECT %s AS repository, %s AS revision, %s AS config, %s AS split, "
+	                                "count(*)::UBIGINT AS file_count, sum(num_rows)::HUGEINT AS total_rows, "
+	                                "sum(num_row_groups)::HUGEINT AS total_row_groups, "
+	                                "sum(file_size_bytes)::HUGEINT AS total_file_size_bytes "
+	                                "FROM parquet_file_metadata(%s)",
+	                                Value(options.repository).ToSQLString(), Value(options.revision).ToSQLString(),
+	                                Value(config).ToSQLString(), Value(split).ToSQLString(),
+	                                Value(options.Pattern()).ToSQLString());
 	return ParseProfileQuery(context, query);
 }
 

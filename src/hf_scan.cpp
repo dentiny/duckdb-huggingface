@@ -20,8 +20,7 @@ unique_ptr<TableRef> HFScanBindReplace(ClientContext &context, TableFunctionBind
 	vector<unique_ptr<ParsedExpression>> arguments;
 	arguments.push_back(make_uniq<ConstantExpression>(Value(pattern)));
 
-	auto union_by_name =
-	    make_uniq<ConstantExpression>(Value::BOOLEAN(GetNamedBoolean(input, "union_by_name", true)));
+	auto union_by_name = make_uniq<ConstantExpression>(Value::BOOLEAN(GetNamedBoolean(input, "union_by_name", true)));
 	union_by_name->SetAlias("union_by_name");
 	arguments.push_back(std::move(union_by_name));
 

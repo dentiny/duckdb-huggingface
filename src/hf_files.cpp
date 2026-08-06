@@ -68,12 +68,11 @@ vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBin
 		if (file_size < 0) {
 			throw IOException("Could not determine size of Hugging Face file '%s'", match.path);
 		}
-		result.push_back(
-		    {options.repository, options.revision, config, split, result.size(), match.path, NumericCast<idx_t>(file_size)});
+		result.push_back({options.repository, options.revision, config, split, result.size(), match.path,
+		                  NumericCast<idx_t>(file_size)});
 	}
-	std::sort(result.begin(), result.end(), [](const HuggingFaceFile &left, const HuggingFaceFile &right) {
-		return left.path < right.path;
-	});
+	std::sort(result.begin(), result.end(),
+	          [](const HuggingFaceFile &left, const HuggingFaceFile &right) { return left.path < right.path; });
 	for (idx_t index = 0; index < result.size(); index++) {
 		result[index].file_index = index;
 	}
