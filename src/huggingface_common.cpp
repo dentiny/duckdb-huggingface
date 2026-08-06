@@ -1,6 +1,7 @@
 #include "huggingface_common.hpp"
 
 #include "duckdb/common/exception.hpp"
+#include "duckdb/common/string_util.hpp"
 
 namespace duckdb {
 
@@ -30,6 +31,27 @@ string TrimSlashes(string value) {
 	return value;
 }
 
+void InferConfigAndSplitFromPath(HuggingFaceOptions &options) {
+	auto path = TrimSlashes(options.path);
+	if (path.empty() || path.find_first_of("*?[") != string::npos) {
+		return;
+	}
+	auto first_separator = path.find('/');
+	if (first_separator == string::npos) {
+		return;
+	}
+	auto second_separator = path.find('/', first_separator + 1);
+	if (second_separator == string::npos) {
+		return;
+	}
+	if (options.config.empty()) {
+		options.config = path.substr(0, first_separator);
+	}
+	if (options.split.empty()) {
+		options.split = path.substr(first_separator + 1, second_separator - first_separator - 1);
+	}
+}
+
 } // namespace
 
 HuggingFaceOptions HuggingFaceOptions::Parse(const TableFunctionBindInput &input) {
@@ -43,6 +65,7 @@ HuggingFaceOptions HuggingFaceOptions::Parse(const TableFunctionBindInput &input
 	result.config = GetNamedString(input, "config");
 	result.split = GetNamedString(input, "split");
 	result.path = GetNamedString(input, "path");
+	InferConfigAndSplitFromPath(result);
 	return result;
 }
 
@@ -52,9 +75,9 @@ string HuggingFaceOptions::Pattern() const {
 	auto normalized_split = TrimSlashes(split.empty() ? "**" : split);
 	auto pattern_path = normalized_path;
 	if (pattern_path.empty()) {
-		pattern_path = normalized_config + "/" + normalized_split + "/**/*.parquet";
+		pattern_path = StringUtil::Format("%s/%s/**/*.parquet", normalized_config, normalized_split);
 	}
-	return "hf://datasets/" + repository + "@" + revision + "/" + pattern_path;
+	return StringUtil::Format("hf://datasets/%s@%s/%s", repository, revision, pattern_path);
 }
 
 } // namespace duckdb

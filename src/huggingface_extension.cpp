@@ -11,9 +11,8 @@ void LoadInternal(ExtensionLoader &loader) {
 	loader.SetDescription("Discover and query Hugging Face datasets through cache_httpfs");
 	RegisterHFFiles(loader);
 	RegisterHFScan(loader);
-	RegisterHFSchema(loader);
 	RegisterHFProfile(loader);
-	RegisterHFDatasetSize(loader);
+	RegisterHFBlobSize(loader);
 }
 
 } // namespace

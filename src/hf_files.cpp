@@ -1,6 +1,11 @@
 #include "huggingface_common.hpp"
 
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/common/string_util.hpp"
+#include "duckdb/parser/keyword_helper.hpp"
+#include "duckdb/parser/parser.hpp"
+#include "duckdb/parser/statement/select_statement.hpp"
+#include "duckdb/parser/tableref/subqueryref.hpp"
 
 #include <algorithm>
 
@@ -15,7 +20,7 @@ struct HuggingFaceFile {
 	string split;
 	idx_t file_index;
 	string path;
-	idx_t size_bytes;
+	idx_t parquet_size_bytes;
 };
 
 vector<string> SplitPath(const string &path) {
@@ -50,7 +55,7 @@ void InferConfigAndSplit(const string &file_path, const string &repository, stri
 	}
 }
 
-vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBindInput &input) {
+vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBindInput &input, bool load_file_sizes) {
 	auto options = HuggingFaceOptions::Parse(input);
 
 	auto &file_system = FileSystem::GetFileSystem(context);
@@ -63,13 +68,16 @@ vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBin
 		if (config.empty() || split.empty()) {
 			InferConfigAndSplit(match.path, options.repository, config, split);
 		}
-		auto handle = file_system.OpenFile(match, FileFlags::FILE_FLAGS_READ);
-		auto file_size = file_system.GetFileSize(*handle);
-		if (file_size < 0) {
-			throw IOException("Could not determine size of Hugging Face file '%s'", match.path);
+		idx_t file_size = 0;
+		if (load_file_sizes) {
+			auto handle = file_system.OpenFile(match, FileFlags::FILE_FLAGS_READ);
+			auto resolved_size = file_system.GetFileSize(*handle);
+			if (resolved_size < 0) {
+				throw IOException("Could not determine size of Hugging Face file '%s'", match.path);
+			}
+			file_size = NumericCast<idx_t>(resolved_size);
 		}
-		result.push_back({options.repository, options.revision, config, split, result.size(), match.path,
-		                  NumericCast<idx_t>(file_size)});
+		result.push_back({options.repository, options.revision, config, split, result.size(), match.path, file_size});
 	}
 	std::sort(result.begin(), result.end(),
 	          [](const HuggingFaceFile &left, const HuggingFaceFile &right) { return left.path < right.path; });
@@ -79,60 +87,122 @@ vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBin
 	return result;
 }
 
-struct HFFilesBindData : public TableFunctionData {
-	explicit HFFilesBindData(vector<HuggingFaceFile> files_p) : files(std::move(files_p)) {
+string GetNamedString(const TableFunctionBindInput &input, const string &name) {
+	auto entry = input.named_parameters.find(name);
+	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
+		return "";
 	}
-
-	vector<HuggingFaceFile> files;
-};
-
-struct HFFilesGlobalState : public GlobalTableFunctionState {
-	idx_t offset = 0;
-
-	idx_t MaxThreads() const override {
-		return 1;
-	}
-};
-
-unique_ptr<FunctionData> HFFilesBind(ClientContext &context, TableFunctionBindInput &input,
-                                     vector<LogicalType> &return_types, vector<string> &names) {
-	return_types = {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                LogicalType::UBIGINT, LogicalType::VARCHAR, LogicalType::UBIGINT};
-	names = {"repository", "revision", "config", "split", "file_index", "path", "size_bytes"};
-	return make_uniq<HFFilesBindData>(GlobFiles(context, input));
+	return entry->second.GetValue<string>();
 }
 
-unique_ptr<GlobalTableFunctionState> HFFilesInit(ClientContext &context, TableFunctionInitInput &input) {
-	return make_uniq<HFFilesGlobalState>();
+idx_t GetBlobConcurrency(const TableFunctionBindInput &input) {
+	auto entry = input.named_parameters.find("blob_concurrency");
+	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
+		return 32;
+	}
+	auto concurrency = entry->second.GetValue<int64_t>();
+	if (concurrency < 1 || concurrency > 256) {
+		throw InvalidInputException("blob_concurrency must be between 1 and 256");
+	}
+	return NumericCast<idx_t>(concurrency);
 }
 
-void HFFilesFunction(ClientContext &context, TableFunctionInput &input, DataChunk &output) {
-	auto &bind_data = input.bind_data->Cast<HFFilesBindData>();
-	auto &state = input.global_state->Cast<HFFilesGlobalState>();
-	auto remaining = bind_data.files.size() - state.offset;
-	auto count = MinValue<idx_t>(STANDARD_VECTOR_SIZE, remaining);
-	for (idx_t row_index = 0; row_index < count; row_index++) {
-		auto &file = bind_data.files[state.offset + row_index];
-		output.data[0].SetValue(row_index, Value(file.repository));
-		output.data[1].SetValue(row_index, Value(file.revision));
-		output.data[2].SetValue(row_index, Value(file.config));
-		output.data[3].SetValue(row_index, Value(file.split));
-		output.data[4].SetValue(row_index, Value::UBIGINT(file.file_index));
-		output.data[5].SetValue(row_index, Value(file.path));
-		output.data[6].SetValue(row_index, Value::UBIGINT(file.size_bytes));
+unique_ptr<TableRef> ParseFilesQuery(ClientContext &context, const string &query) {
+	Parser parser(context.GetParserOptions());
+	parser.ParseQuery(query);
+	auto statement = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(parser.statements[0]));
+	return make_uniq<SubqueryRef>(std::move(statement));
+}
+
+string BuildFilesValues(const vector<HuggingFaceFile> &files) {
+	vector<string> rows;
+	rows.reserve(files.size());
+	for (const auto &file : files) {
+		rows.push_back(StringUtil::Format("(%s, %s, %s, %s, %s::UBIGINT, %s, %s::UBIGINT)",
+		                                  Value(file.repository).ToSQLString(), Value(file.revision).ToSQLString(),
+		                                  Value(file.config).ToSQLString(), Value(file.split).ToSQLString(),
+		                                  Value::UBIGINT(file.file_index).ToSQLString(), Value(file.path).ToSQLString(),
+		                                  Value::UBIGINT(file.parquet_size_bytes).ToSQLString()));
 	}
-	state.offset += count;
-	output.SetCardinality(count);
+	return StringUtil::Join(rows, ", ");
+}
+
+string BuildParquetOnlyQuery(const string &file_values) {
+	return StringUtil::Format(
+	    "WITH files(repository, revision, config, split, file_index, path, parquet_size_bytes) AS (VALUES %s) "
+	    "SELECT repository, revision, config, split, file_index, path, parquet_size_bytes "
+	    "FROM files ORDER BY file_index",
+	    file_values);
+}
+
+string BuildBlobQuery(const string &file_values, const string &file_paths, const string &blob_column,
+                      idx_t blob_concurrency) {
+	return StringUtil::Format(
+	    "WITH files(repository, revision, config, split, file_index, path, parquet_size_bytes) AS (VALUES %s), "
+	    "blob_refs AS MATERIALIZED ("
+	    "SELECT filename AS path, url FROM ("
+	    "SELECT filename, unnest(%s)::VARCHAR AS url FROM parquet_scan(%s, filename := true)"
+	    ") WHERE url IS NOT NULL AND url <> ''"
+	    "), parquet_sizes AS MATERIALIZED ("
+	    "SELECT files.path, huggingface_internal_blob_size(files.path, %s + scanned_rows * 0) AS parquet_size_bytes "
+	    "FROM files CROSS JOIN (SELECT count(*)::UBIGINT AS scanned_rows FROM blob_refs)"
+	    "), blob_sizes AS MATERIALIZED ("
+	    "SELECT url, huggingface_internal_blob_size(url, %s) AS blob_size_bytes "
+	    "FROM (SELECT DISTINCT url FROM blob_refs)"
+	    "), logical_stats AS ("
+	    "SELECT path, count(*)::UBIGINT AS logical_blob_count, "
+	    "coalesce(sum(blob_size_bytes), 0)::HUGEINT AS logical_blob_size_bytes "
+	    "FROM blob_refs LEFT JOIN blob_sizes USING (url) GROUP BY path"
+	    "), physical_refs AS MATERIALIZED (SELECT DISTINCT path, url FROM blob_refs), "
+	    "physical_stats AS ("
+	    "SELECT path, count(*)::UBIGINT AS physical_blob_count, "
+	    "coalesce(sum(blob_size_bytes), 0)::HUGEINT AS physical_blob_size_bytes, "
+	    "count(*) FILTER (WHERE blob_size_bytes IS NULL)::UBIGINT AS unresolved_blob_count "
+	    "FROM physical_refs LEFT JOIN blob_sizes USING (url) GROUP BY path"
+	    ") SELECT files.repository, files.revision, files.config, files.split, files.file_index, files.path, "
+	    "CASE WHEN parquet_sizes.parquet_size_bytes IS NOT NULL AND coalesce(unresolved_blob_count, 0) = 0 "
+	    "THEN parquet_sizes.parquet_size_bytes + coalesce(physical_blob_size_bytes, 0) END::HUGEINT AS size_bytes, "
+	    "parquet_sizes.parquet_size_bytes::UBIGINT AS parquet_size_bytes, "
+	    "coalesce(logical_blob_size_bytes, 0)::HUGEINT AS logical_blob_size_bytes, "
+	    "coalesce(physical_blob_size_bytes, 0)::HUGEINT AS physical_blob_size_bytes, "
+	    "coalesce(logical_blob_count, 0)::UBIGINT AS logical_blob_count, "
+	    "coalesce(physical_blob_count, 0)::UBIGINT AS physical_blob_count, "
+	    "coalesce(unresolved_blob_count, 0)::UBIGINT AS unresolved_blob_count "
+	    "FROM files LEFT JOIN parquet_sizes USING (path) LEFT JOIN logical_stats USING (path) "
+	    "LEFT JOIN physical_stats USING (path) "
+	    "ORDER BY files.file_index",
+	    file_values, KeywordHelper::WriteQuoted(blob_column, '"'), file_paths,
+	    Value::UBIGINT(blob_concurrency).ToSQLString(), Value::UBIGINT(blob_concurrency).ToSQLString());
+}
+
+unique_ptr<TableRef> HFFilesBindReplace(ClientContext &context, TableFunctionBindInput &input) {
+	auto blob_column = GetNamedString(input, "blob_column");
+	auto files = GlobFiles(context, input, blob_column.empty());
+	auto file_values = BuildFilesValues(files);
+	if (blob_column.empty()) {
+		return ParseFilesQuery(context, BuildParquetOnlyQuery(file_values));
+	}
+
+	vector<Value> paths;
+	paths.reserve(files.size());
+	for (const auto &file : files) {
+		paths.emplace_back(file.path);
+	}
+	auto file_paths = Value::LIST(LogicalType::VARCHAR, std::move(paths)).ToSQLString();
+	return ParseFilesQuery(context, BuildBlobQuery(file_values, file_paths, blob_column, GetBlobConcurrency(input)));
 }
 
 } // namespace
 
 void RegisterHFFiles(ExtensionLoader &loader) {
-	TableFunction function("hf_files", {LogicalType::VARCHAR}, HFFilesFunction, HFFilesBind, HFFilesInit);
+	TableFunction function("hf_files", {LogicalType::VARCHAR}, nullptr, nullptr);
 	function.named_parameters["revision"] = LogicalType::VARCHAR;
 	function.named_parameters["config"] = LogicalType::VARCHAR;
 	function.named_parameters["split"] = LogicalType::VARCHAR;
 	function.named_parameters["path"] = LogicalType::VARCHAR;
+	function.named_parameters["blob_column"] = LogicalType::VARCHAR;
+	function.named_parameters["blob_concurrency"] = LogicalType::BIGINT;
+	function.bind_replace = HFFilesBindReplace;
 	loader.RegisterFunction(function);
 }
 
