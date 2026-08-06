@@ -20,5 +20,6 @@ void RegisterHFFiles(ExtensionLoader &loader);
 void RegisterHFScan(ExtensionLoader &loader);
 void RegisterHFSchema(ExtensionLoader &loader);
 void RegisterHFProfile(ExtensionLoader &loader);
+void RegisterHFDatasetSize(ExtensionLoader &loader);
 
 } // namespace duckdb

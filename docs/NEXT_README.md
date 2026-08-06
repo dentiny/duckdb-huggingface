@@ -13,6 +13,15 @@ FROM hf_files(
     split = 'train'
 );
 
+-- Count files and measure their physical Parquet storage.
+SELECT count(*) AS file_count, sum(size_bytes) AS parquet_size_bytes
+FROM hf_files('ibm/duorc', config = 'ParaphraseRC', split = 'train');
+
+-- Measure only a selected set of files.
+SELECT count(*) AS file_count, sum(size_bytes) AS parquet_size_bytes
+FROM hf_files('ibm/duorc', config = 'ParaphraseRC', split = 'train')
+WHERE path IN ('hf://datasets/ibm/duorc@~parquet/ParaphraseRC/train/0000.parquet');
+
 FROM hf_schema(
     'ibm/duorc',
     config = 'ParaphraseRC',
@@ -31,6 +40,10 @@ FROM hf_scan(
     split = 'train'
 ) LIMIT 10;
 ```
+
+`size_bytes` is the complete physical Parquet object size, including binary/blob values stored inline in the file.
+It does not include objects referenced only by external URLs. For example, MINT-1T-HTML stores image URLs rather
+than image bytes, so those remote images are not part of its Parquet size.
 
 `hf_scan` delegates execution to DuckDB HTTPFS and the Parquet scanner, preserving Hugging Face authentication, revision handling, globbing, projection pushdown, and filter pushdown. The default revision is Hugging Face's auto-converted `~parquet` branch. Use DuckDB's Hugging Face secret for private or gated datasets:
 
