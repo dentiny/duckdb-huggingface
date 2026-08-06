@@ -8,6 +8,24 @@ require parquet
 
 require huggingface
 
+statement ok
+SET cache_httpfs_cache_directory = '__TEST_DIR__/cache';
+
+query I
+SELECT cache_httpfs_clear_cache();
+----
+true
+
+query T
+SELECT current_setting('cache_httpfs_type');
+----
+in_mem
+
+query I
+SELECT cache_httpfs_get_ondisk_data_cache_size();
+----
+0
+
 statement error
 SELECT * FROM hf_files('invalid-repository-name');
 ----
@@ -47,3 +65,8 @@ SELECT file_count > 0 AND total_rows > 0
 FROM hf_profile('ibm/duorc', config = 'ParaphraseRC', split = 'train');
 ----
 true
+
+query I
+SELECT cache_httpfs_get_ondisk_data_cache_size();
+----
+0
