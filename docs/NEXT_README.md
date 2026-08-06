@@ -1,11 +1,45 @@
-# Quack
+# DuckDB Hugging Face
 
 This repository is based on https://github.com/duckdb/extension-template, check it out if you want to build and ship your own DuckDB extension.
 
----
+The extension discovers Hugging Face Dataset Viewer Parquet files from a repository, config, and split.
 
-This extension, Quack, allow you to ... <extension_goal>.
+```sql
+LOAD huggingface;
 
+FROM hf_files(
+    'ibm/duorc',
+    config = 'ParaphraseRC',
+    split = 'train'
+);
+
+FROM hf_schema(
+    'ibm/duorc',
+    config = 'ParaphraseRC',
+    split = 'train'
+);
+
+FROM hf_profile(
+    'ibm/duorc',
+    config = 'ParaphraseRC',
+    split = 'train'
+);
+
+FROM hf_scan(
+    'ibm/duorc',
+    config = 'ParaphraseRC',
+    split = 'train'
+) LIMIT 10;
+```
+
+`hf_scan` delegates execution to DuckDB HTTPFS and the Parquet scanner, preserving Hugging Face authentication, revision handling, globbing, projection pushdown, and filter pushdown. The default revision is Hugging Face's auto-converted `~parquet` branch. Use DuckDB's Hugging Face secret for private or gated datasets:
+
+```sql
+CREATE SECRET hf_token (
+    TYPE HUGGINGFACE,
+    PROVIDER credential_chain
+);
+```
 
 ## Building
 ### Managing dependencies
@@ -26,7 +60,7 @@ The main binaries that will be built are:
 ```sh
 ./build/release/duckdb
 ./build/release/test/unittest
-./build/release/extension/quack/quack.duckdb_extension
+./build/release/extension/huggingface/huggingface.duckdb_extension
 ```
 - `duckdb` is the binary for the duckdb shell with the extension code automatically loaded.
 - `unittest` is the test runner of duckdb. Again, the extension is already linked into the binary.
@@ -35,16 +69,7 @@ The main binaries that will be built are:
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
 
-Now we can use the features from the extension directly in DuckDB. The template contains a single scalar function `quack()` that takes a string arguments and returns a string:
-```
-D select quack('Jane') as result;
-┌───────────────┐
-│    result     │
-│    varchar    │
-├───────────────┤
-│ Quack Jane 🐥 │
-└───────────────┘
-```
+The extension functions are available directly in the built DuckDB shell.
 
 ## Running the tests
 Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
@@ -81,8 +106,8 @@ DuckDB. To specify a specific version, you can pass the version instead.
 
 After running these steps, you can install and load your extension using the regular INSTALL/LOAD commands in DuckDB:
 ```sql
-INSTALL quack;
-LOAD quack;
+INSTALL huggingface;
+LOAD huggingface;
 ```
 
 ## Setting up CLion
