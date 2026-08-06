@@ -6,3 +6,6 @@
 	path = extension-ci-tools
 	url = https://github.com/duckdb/extension-ci-tools
 	branch = main
+[submodule "cache-httpfs"]
+	path = cache-httpfs
+	url = https://github.com/dentiny/duck-read-cache-fs.git
