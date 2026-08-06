@@ -13,6 +13,7 @@ void LoadInternal(ExtensionLoader &loader) {
 	RegisterHFScan(loader);
 	RegisterHFSchema(loader);
 	RegisterHFProfile(loader);
+	RegisterHFDatasetSize(loader);
 }
 
 } // namespace

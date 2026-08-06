@@ -15,6 +15,7 @@ struct HuggingFaceFile {
 	string split;
 	idx_t file_index;
 	string path;
+	idx_t size_bytes;
 };
 
 vector<string> SplitPath(const string &path) {
@@ -62,7 +63,13 @@ vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBin
 		if (config.empty() || split.empty()) {
 			InferConfigAndSplit(match.path, options.repository, config, split);
 		}
-		result.push_back({options.repository, options.revision, config, split, result.size(), match.path});
+		auto handle = file_system.OpenFile(match, FileFlags::FILE_FLAGS_READ);
+		auto file_size = file_system.GetFileSize(*handle);
+		if (file_size < 0) {
+			throw IOException("Could not determine size of Hugging Face file '%s'", match.path);
+		}
+		result.push_back(
+		    {options.repository, options.revision, config, split, result.size(), match.path, NumericCast<idx_t>(file_size)});
 	}
 	std::sort(result.begin(), result.end(), [](const HuggingFaceFile &left, const HuggingFaceFile &right) {
 		return left.path < right.path;
@@ -90,9 +97,9 @@ struct HFFilesGlobalState : public GlobalTableFunctionState {
 
 unique_ptr<FunctionData> HFFilesBind(ClientContext &context, TableFunctionBindInput &input,
                                      vector<LogicalType> &return_types, vector<string> &names) {
-	return_types = {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                LogicalType::VARCHAR, LogicalType::UBIGINT, LogicalType::VARCHAR};
-	names = {"repository", "revision", "config", "split", "file_index", "path"};
+	return_types = {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR,
+	                LogicalType::UBIGINT, LogicalType::VARCHAR, LogicalType::UBIGINT};
+	names = {"repository", "revision", "config", "split", "file_index", "path", "size_bytes"};
 	return make_uniq<HFFilesBindData>(GlobFiles(context, input));
 }
 
@@ -113,6 +120,7 @@ void HFFilesFunction(ClientContext &context, TableFunctionInput &input, DataChun
 		output.data[3].SetValue(row_index, Value(file.split));
 		output.data[4].SetValue(row_index, Value::UBIGINT(file.file_index));
 		output.data[5].SetValue(row_index, Value(file.path));
+		output.data[6].SetValue(row_index, Value::UBIGINT(file.size_bytes));
 	}
 	state.offset += count;
 	output.SetCardinality(count);
