@@ -21,6 +21,11 @@ SELECT current_setting('cache_httpfs_type');
 ----
 in_mem
 
+query T
+SELECT "data cache" FROM cache_httpfs_get_cache_type();
+----
+in_mem
+
 query I
 SELECT cache_httpfs_get_ondisk_data_cache_size();
 ----
