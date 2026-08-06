@@ -4,12 +4,11 @@
 
 ### Added
 
-- `hf_files` for discovering Hugging Face Parquet files and their physical sizes.
+- `hf_files` for discovering Hugging Face Parquet files and reporting per-file Parquet, logical blob, and physical
+  blob sizes.
 - `hf_scan` for querying Hugging Face datasets through DuckDB's Parquet scanner.
-- `hf_schema` for inspecting physical Parquet schemas.
 - `hf_profile` for summarizing file, row, row-group, and storage metadata.
-- `hf_dataset_size` for measuring Parquet storage and deduplicated external blobs.
-- `parquet_dataset_size` for measuring user-provided Parquet file sets and their external blobs.
+- `hf_dataset_estimate` for estimating total Parquet and external-blob storage with HyperLogLog and blob sampling.
 - Configurable parallel external-blob size resolution.
 
 ### Documentation

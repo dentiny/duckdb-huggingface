@@ -20,13 +20,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(src/include)
 
 set(EXTENSION_SOURCES
-    src/huggingface_extension.cpp
-    src/huggingface_common.cpp
-    src/hf_files.cpp
-    src/hf_scan.cpp
-    src/hf_schema.cpp
-    src/hf_profile.cpp
-    src/hf_dataset_size.cpp)
+    src/huggingface_extension.cpp src/huggingface_common.cpp src/hf_files.cpp
+    src/hf_scan.cpp src/hf_profile.cpp src/hf_dataset_size.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})

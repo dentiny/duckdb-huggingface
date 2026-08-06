@@ -14,13 +14,20 @@ SELECT * FROM hf_files('invalid-repository-name');
 Invalid Input Error: Hugging Face repository must use the 'owner/name' form
 
 query I
+SELECT count(*)
+FROM duckdb_functions()
+WHERE function_name = 'hf_dataset_estimate';
+----
+1
+
+query I
 SELECT count(*) > 0
 FROM hf_files('ibm/duorc', config = 'ParaphraseRC', split = 'train');
 ----
 true
 
 query I
-SELECT count(*) > 0 AND sum(size_bytes) > 0
+SELECT count(*) > 0 AND sum(parquet_size_bytes) > 0
 FROM hf_files('ibm/duorc', config = 'ParaphraseRC', split = 'train');
 ----
 true
@@ -32,12 +39,6 @@ FROM (
     FROM hf_scan('ibm/duorc', config = 'ParaphraseRC', split = 'train')
     LIMIT 1
 );
-----
-true
-
-query I
-SELECT count(*) > 0
-FROM hf_schema('ibm/duorc', config = 'ParaphraseRC', split = 'train');
 ----
 true
 
