@@ -108,32 +108,41 @@ The profile reports file count, rows, row groups, and physical Parquet storage.
 For URL-backed image datasets, estimate total Parquet and external-blob storage without issuing one request per blob:
 
 ```sql
+SELECT
+    parquet_file_count,
+    format_bytes(parquet_size_bytes) AS estimated_parquet_size,
+    estimated_blob_dup_rate,
+    format_bytes(estimated_blob_size_bytes) AS estimated_blob_size,
+    format_bytes(estimated_dataset_size_bytes) AS estimated_dataset_size
 FROM hf_dataset_estimate(
     'mlfoundations/MINT-1T-HTML',
+    path = 'data-v1.1/partial-train/0001.parquet',
     blob_column = 'images',
     blob_hash_column = 'image_hashes',
-    blob_sample_size = 1000,
-    blob_sample_pool_size = 4000,
-    blob_concurrency = 8
+    row_sample_size = 100,
+    blob_concurrency = 14
 );
 ```
 
-The function reports exact Parquet file and logical blob counts, an approximate distinct physical blob count,
-sample resolution statistics, average sampled blob size, and estimated blob and overall dataset sizes.
-`blob_hash_column` is optional; without it, distinct URLs are counted instead. Distinct counts use HyperLogLog, while
-blob sizes are extrapolated from a reservoir sample, so blob and overall byte values are estimates.
+The function reports the exact Parquet file count and sampled estimates for Parquet bytes, logical and physical blob
+counts, blob bytes, and overall dataset bytes. It reads the footer and at most `row_sample_size` rows from the middle
+Parquet file instead of scanning every Parquet file. `blob_hash_column` is optional; without it, URLs identify physical
+blobs.
 
 Estimation methodology:
 
-1. Unnest `blob_column`, discard `NULL` and empty values, and count every remaining reference to obtain
-   `logical_blob_count`.
-2. Estimate `estimated_physical_blob_count` with DuckDB's HyperLogLog-based `approx_count_distinct`. The identity is
-   `blob_hash_column` when supplied; otherwise it is the blob URL from `blob_column`.
-3. Reservoir-sample `blob_sample_pool_size` URL references, deduplicate that sample, and retain at most
-   `blob_sample_size` URLs. The pool defaults to four times `blob_sample_size`; both values are configurable.
-4. Resolve sampled URLs in parallel. `average_blob_size_bytes` includes only successfully resolved URLs.
-5. Calculate `estimated_blob_size_bytes` as `estimated_physical_blob_count * average_blob_size_bytes`, then add exact
-   Parquet bytes to obtain `estimated_dataset_size_bytes`.
+1. Select the middle matching Parquet file and read its footer for row count and physical file size.
+2. Read at most `row_sample_size` projected rows, then estimate logical blob density and physical-identity density.
+3. Scale the sampled file size, row count, and blob densities by the total matching Parquet file count.
+4. Reservoir-sample at most `row_sample_size` blob references, deduplicate them by hash (or URL), and resolve every
+   remaining URL in parallel. `estimated_blob_dup_rate` reports `1 - distinct references / sampled references`.
+5. Calculate `estimated_blob_size_bytes` from estimated physical count and average resolved size, then add estimated
+   Parquet bytes.
+
+This trades precision for stable request volume: metadata is fetched for one Parquet file, one bounded projected scan
+supplies all blob statistics, and only sampled blob URLs are resolved. `row_sample_size` bounds both the projected
+Parquet rows and sampled blob references, so no more than that many blob-size requests are issued. The output includes
+`sampled_parquet_file_count` and `sampled_row_count` so callers can see the sample basis.
 
 ### Measure per-file Parquet and blob storage
 
@@ -194,10 +203,10 @@ FROM hf_profile('ibm/duorc', config = 'ParaphraseRC', split = 'train');
 ```sql
 FROM hf_dataset_estimate(
     'mlfoundations/MINT-1T-HTML',
-    path = 'data-v1.1/partial-train/0000.parquet',
+    path = 'data-v1.1/partial-train/0001.parquet',
     blob_column = 'images',
-    blob_sample_size = 100,
-    blob_sample_pool_size = 400,
+    blob_hash_column = 'image_hashes',
+    row_sample_size = 100,
     blob_concurrency = 14
 );
 ```
