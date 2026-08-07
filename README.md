@@ -18,6 +18,7 @@ LOAD huggingface;
 ```
 
 The default revision is Hugging Face's auto-converted `~parquet` branch. Repositories use the `owner/name` form.
+Functions accept `revision`, `config`, `split`, and `path` where applicable.
 
 ### Selecting files with `path`
 
@@ -108,12 +109,6 @@ The profile reports file count, rows, row groups, and physical Parquet storage.
 For URL-backed image datasets, estimate total Parquet and external-blob storage without issuing one request per blob:
 
 ```sql
-SELECT
-    parquet_file_count,
-    format_bytes(parquet_size_bytes) AS estimated_parquet_size,
-    estimated_blob_dup_rate,
-    format_bytes(estimated_blob_size_bytes) AS estimated_blob_size,
-    format_bytes(estimated_dataset_size_bytes) AS estimated_dataset_size
 FROM hf_dataset_estimate(
     'mlfoundations/MINT-1T-HTML',
     path = 'data-v1.1/partial-train/0001.parquet',
@@ -124,25 +119,32 @@ FROM hf_dataset_estimate(
 );
 ```
 
-The function reports the exact Parquet file count and sampled estimates for Parquet bytes, logical and physical blob
-counts, blob bytes, and overall dataset bytes. It reads the footer and at most `row_sample_size` rows from the middle
-Parquet file instead of scanning every Parquet file. `blob_hash_column` is optional; without it, URLs identify physical
-blobs.
+The function reports the exact matching Parquet file count and sampled estimates for Parquet bytes, logical and
+physical blob counts, blob bytes, and overall dataset bytes. It reads the footer and at most `row_sample_size` rows
+from the middle matching Parquet file instead of scanning every Parquet file. `row_sample_size` defaults to 100 and
+accepts values from 1 to 100,000. `blob_hash_column` is optional; without it, URLs identify physical blobs.
 
 Estimation methodology:
 
 1. Select the middle matching Parquet file and read its footer for row count and physical file size.
-2. Read at most `row_sample_size` projected rows, then estimate logical blob density and physical-identity density.
-3. Scale the sampled file size, row count, and blob densities by the total matching Parquet file count.
-4. Reservoir-sample at most `row_sample_size` blob references, deduplicate them by hash (or URL), and resolve every
-   remaining URL in parallel. `estimated_blob_dup_rate` reports `1 - distinct references / sampled references`.
-5. Calculate `estimated_blob_size_bytes` from estimated physical count and average resolved size, then add estimated
-   Parquet bytes.
+2. Read at most `row_sample_size` projected rows and use their non-empty URLs to estimate logical blobs per row.
+3. Scale the sampled file size and logical blob density by the total matching Parquet file count.
+4. Reservoir-sample at most `row_sample_size` valid blob references, deduplicate them by hash (or URL), and resolve one
+   URL per identity in parallel. The sampled distinct/reference ratio estimates the physical blob count;
+   `estimated_blob_dup_rate` is one minus that ratio.
+5. Average successfully resolved sizes, multiply that average by `estimated_physical_blob_count`, and add the
+   estimated Parquet bytes. Failed size resolutions are excluded from the average; blob and dataset size estimates are
+   `NULL` if no sampled size resolves.
 
 This trades precision for stable request volume: metadata is fetched for one Parquet file, one bounded projected scan
 supplies all blob statistics, and only sampled blob URLs are resolved. `row_sample_size` bounds both the projected
 Parquet rows and sampled blob references, so no more than that many blob-size requests are issued. The output includes
 `sampled_parquet_file_count` and `sampled_row_count` so callers can see the sample basis.
+
+The returned estimate columns are `parquet_file_count`, `sampled_parquet_file_count`, `sampled_row_count`,
+`parquet_size_bytes`, `logical_blob_count`, `estimated_physical_blob_count`, `estimated_blob_dup_rate`,
+`average_blob_size_bytes`, `estimated_blob_size_bytes`, and `estimated_dataset_size_bytes`, in addition to the
+repository, revision, config, and split.
 
 ### Measure per-file Parquet and blob storage
 
@@ -172,46 +174,6 @@ Blob concurrency defaults to 32 and accepts values from 1 to 256.
 
 External sizing performs one remote metadata request per distinct URL. It can be expensive for datasets containing
 millions or billions of unique blobs.
-
-## Supported functions
-
-`hf_files(repository, ...)` discovers Parquet files and optionally measures per-file logical and physical blob sizes:
-
-```sql
-FROM hf_files(
-    'mlfoundations/MINT-1T-HTML',
-    path = 'data-v1.1/partial-train/*.parquet'
-);
-```
-
-`hf_scan(repository, ...)` queries a Hugging Face dataset with DuckDB's Parquet scanner:
-
-```sql
-SELECT *
-FROM hf_scan('ibm/duorc', config = 'ParaphraseRC', split = 'train')
-LIMIT 10;
-```
-
-`hf_profile(repository, ...)` summarizes file, row, row-group, and storage metadata:
-
-```sql
-FROM hf_profile('ibm/duorc', config = 'ParaphraseRC', split = 'train');
-```
-
-`hf_dataset_estimate(repository, ...)` efficiently estimates total Parquet and external-blob storage:
-
-```sql
-FROM hf_dataset_estimate(
-    'mlfoundations/MINT-1T-HTML',
-    path = 'data-v1.1/partial-train/0001.parquet',
-    blob_column = 'images',
-    blob_hash_column = 'image_hashes',
-    row_sample_size = 100,
-    blob_concurrency = 14
-);
-```
-
-The Hugging Face functions accept `revision`, `config`, `split`, and `path` options where applicable.
 
 ## Authentication
 
