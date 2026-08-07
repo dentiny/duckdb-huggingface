@@ -18,6 +18,7 @@ LOAD huggingface;
 ```
 
 The default revision is Hugging Face's auto-converted `~parquet` branch. Repositories use the `owner/name` form.
+Functions accept `revision`, `config`, `split`, and `path` where applicable.
 
 ### Selecting files with `path`
 
@@ -124,25 +125,17 @@ FROM hf_dataset_estimate(
 );
 ```
 
-The function reports the exact Parquet file count and sampled estimates for Parquet bytes, logical and physical blob
-counts, blob bytes, and overall dataset bytes. It reads the footer and at most `row_sample_size` rows from the middle
-Parquet file instead of scanning every Parquet file. `blob_hash_column` is optional; without it, URLs identify physical
-blobs.
+The function returns the exact matching file count and sampled estimates for Parquet, blob, and total storage:
 
-Estimation methodology:
+1. Read the footer and at most `row_sample_size` projected rows from the middle matching Parquet file.
+2. Scale that file's size and sampled logical-blob density across all matching files.
+3. Reservoir-sample at most `row_sample_size` blob references and deduplicate them by `blob_hash_column`, or by URL
+   when no hash column is supplied.
+4. Resolve one URL per sampled identity and use the average resolved size to estimate total physical blob storage.
 
-1. Select the middle matching Parquet file and read its footer for row count and physical file size.
-2. Read at most `row_sample_size` projected rows, then estimate logical blob density and physical-identity density.
-3. Scale the sampled file size, row count, and blob densities by the total matching Parquet file count.
-4. Reservoir-sample at most `row_sample_size` blob references, deduplicate them by hash (or URL), and resolve every
-   remaining URL in parallel. `estimated_blob_dup_rate` reports `1 - distinct references / sampled references`.
-5. Calculate `estimated_blob_size_bytes` from estimated physical count and average resolved size, then add estimated
-   Parquet bytes.
-
-This trades precision for stable request volume: metadata is fetched for one Parquet file, one bounded projected scan
-supplies all blob statistics, and only sampled blob URLs are resolved. `row_sample_size` bounds both the projected
-Parquet rows and sampled blob references, so no more than that many blob-size requests are issued. The output includes
-`sampled_parquet_file_count` and `sampled_row_count` so callers can see the sample basis.
+`row_sample_size` defaults to 100, accepts values from 1 to 100,000, and also caps blob-size requests.
+`estimated_blob_dup_rate` is one minus the sampled distinct/reference ratio. Failed size resolutions are excluded from
+the average; blob and dataset size estimates are `NULL` when none resolve.
 
 ### Measure per-file Parquet and blob storage
 
@@ -173,45 +166,10 @@ Blob concurrency defaults to 32 and accepts values from 1 to 256.
 External sizing performs one remote metadata request per distinct URL. It can be expensive for datasets containing
 millions or billions of unique blobs.
 
-## Supported functions
+## Known limitations
 
-`hf_files(repository, ...)` discovers Parquet files and optionally measures per-file logical and physical blob sizes:
-
-```sql
-FROM hf_files(
-    'mlfoundations/MINT-1T-HTML',
-    path = 'data-v1.1/partial-train/*.parquet'
-);
-```
-
-`hf_scan(repository, ...)` queries a Hugging Face dataset with DuckDB's Parquet scanner:
-
-```sql
-SELECT *
-FROM hf_scan('ibm/duorc', config = 'ParaphraseRC', split = 'train')
-LIMIT 10;
-```
-
-`hf_profile(repository, ...)` summarizes file, row, row-group, and storage metadata:
-
-```sql
-FROM hf_profile('ibm/duorc', config = 'ParaphraseRC', split = 'train');
-```
-
-`hf_dataset_estimate(repository, ...)` efficiently estimates total Parquet and external-blob storage:
-
-```sql
-FROM hf_dataset_estimate(
-    'mlfoundations/MINT-1T-HTML',
-    path = 'data-v1.1/partial-train/0001.parquet',
-    blob_column = 'images',
-    blob_hash_column = 'image_hashes',
-    row_sample_size = 100,
-    blob_concurrency = 14
-);
-```
-
-The Hugging Face functions accept `revision`, `config`, `split`, and `path` options where applicable.
+The Hugging Face Hub can host datasets in formats such as Parquet and Lance. This extension currently supports only
+Parquet: file discovery, scanning, profiling, and storage estimation do not recognize or read Lance datasets.
 
 ## Authentication
 

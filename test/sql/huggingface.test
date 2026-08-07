@@ -37,11 +37,26 @@ SELECT * FROM hf_files('invalid-repository-name');
 Invalid Input Error: Hugging Face repository must use the 'owner/name' form
 
 query I
-SELECT count(*)
-FROM duckdb_functions()
-WHERE function_name = 'hf_dataset_estimate';
+SELECT
+    parquet_file_count = 1
+    AND sampled_row_count = 100
+    AND parquet_size_bytes > 0
+    AND logical_blob_count > 0
+    AND estimated_physical_blob_count > 0
+    AND estimated_blob_dup_rate BETWEEN 0 AND 1
+    AND (average_blob_size_bytes IS NULL OR average_blob_size_bytes > 0)
+    AND (estimated_blob_size_bytes IS NULL OR estimated_blob_size_bytes > 0)
+    AND (estimated_dataset_size_bytes IS NULL OR estimated_dataset_size_bytes > parquet_size_bytes)
+FROM hf_dataset_estimate(
+    'mlfoundations/MINT-1T-HTML',
+    path = 'data-v1.1/partial-train/0001.parquet',
+    blob_column = 'images',
+    blob_hash_column = 'image_hashes',
+    row_sample_size = 100,
+    blob_concurrency = 14
+);
 ----
-1
+true
 
 query I
 SELECT count(*) > 0
