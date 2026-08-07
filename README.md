@@ -109,12 +109,6 @@ The profile reports file count, rows, row groups, and physical Parquet storage.
 For URL-backed image datasets, estimate total Parquet and external-blob storage without issuing one request per blob:
 
 ```sql
-SELECT
-    parquet_file_count,
-    format_bytes(parquet_size_bytes) AS estimated_parquet_size,
-    estimated_blob_dup_rate,
-    format_bytes(estimated_blob_size_bytes) AS estimated_blob_size,
-    format_bytes(estimated_dataset_size_bytes) AS estimated_dataset_size
 FROM hf_dataset_estimate(
     'mlfoundations/MINT-1T-HTML',
     path = 'data-v1.1/partial-train/0001.parquet',
