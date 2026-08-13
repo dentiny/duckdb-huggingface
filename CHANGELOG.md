@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.1.0 - 2026-08-06
+## v0.1.1
+
+### Fixed
+
+- `cache_httpfs` needs to be loaded first ([#13])
+
+[#13]: https://github.com/dentiny/duckdb-huggingface/pull/13
+
+## v0.1.0
 
 ### Added
 
