@@ -4,10 +4,34 @@
 #include "huggingface_extension.hpp"
 
 #include "cache_httpfs_config.hpp"
+#include "cache_httpfs_extension.hpp"
+#include "duckdb/main/extension_install_info.hpp"
+#include "duckdb/main/extension_manager.hpp"
 
 namespace duckdb {
 
 namespace {
+
+constexpr const char *CACHE_HTTPFS_EXTENSION = "cache_httpfs";
+
+// huggingface extension set cache_httpfs extension attributes, so need to ensure it is loaded first.
+void EnsureCacheHttpfsExtensionLoaded(ExtensionLoader &loader) {
+	auto &instance = loader.GetDatabaseInstance();
+	auto &extension_manager = ExtensionManager::Get(instance);
+	if (extension_manager.ExtensionIsLoaded(CACHE_HTTPFS_EXTENSION)) {
+		return;
+	}
+
+	CacheHttpfsExtension().Load(loader);
+
+	auto extension_active_load = extension_manager.BeginLoad(CACHE_HTTPFS_EXTENSION);
+	if (!extension_active_load) {
+		return;
+	}
+	ExtensionInstallInfo extension_install_info;
+	extension_install_info.mode = ExtensionInstallMode::UNKNOWN;
+	extension_active_load->FinishLoad(extension_install_info);
+}
 
 // Use in-memory cache for Huggingface access.
 void DisablePersistentCache(ExtensionLoader &loader) {
@@ -16,6 +40,7 @@ void DisablePersistentCache(ExtensionLoader &loader) {
 }
 
 void LoadInternal(ExtensionLoader &loader) {
+	EnsureCacheHttpfsExtensionLoaded(loader);
 	DisablePersistentCache(loader);
 	RegisterHFFiles(loader);
 	RegisterHFScan(loader);

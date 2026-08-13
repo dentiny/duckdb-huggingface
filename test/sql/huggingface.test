@@ -2,8 +2,6 @@
 # description: test Hugging Face extension
 # group: [sql]
 
-require cache_httpfs
-
 require parquet
 
 require huggingface
