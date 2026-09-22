@@ -1,4 +1,5 @@
 #include "huggingface_common.hpp"
+#include "huggingface_functions.hpp"
 
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_system.hpp"
@@ -241,11 +242,12 @@ void HFBlobSizeFunction(DataChunk &args, ExpressionState &state, Vector &result)
 
 } // namespace
 
-void RegisterHFBlobSize(ExtensionLoader &loader) {
-	loader.RegisterFunction(ScalarFunction("huggingface_internal_blob_size",
-	                                       {LogicalType::VARCHAR, LogicalType::UBIGINT}, LogicalType::BIGINT,
-	                                       HFBlobSizeFunction));
+ScalarFunction GetHFBlobSizeFunction() {
+	return ScalarFunction("huggingface_internal_blob_size", {LogicalType::VARCHAR, LogicalType::UBIGINT},
+	                      LogicalType::BIGINT, HFBlobSizeFunction);
+}
 
+TableFunction GetHFDatasetEstimateFunction() {
 	TableFunction hf_dataset_estimate("hf_dataset_estimate", {LogicalType::VARCHAR}, nullptr, nullptr);
 	hf_dataset_estimate.named_parameters["revision"] = LogicalType::VARCHAR;
 	hf_dataset_estimate.named_parameters["config"] = LogicalType::VARCHAR;
@@ -256,7 +258,7 @@ void RegisterHFBlobSize(ExtensionLoader &loader) {
 	hf_dataset_estimate.named_parameters["row_sample_size"] = LogicalType::BIGINT;
 	hf_dataset_estimate.named_parameters["blob_concurrency"] = LogicalType::BIGINT;
 	hf_dataset_estimate.bind_replace = HFDatasetEstimateBindReplace;
-	loader.RegisterFunction(hf_dataset_estimate);
+	return hf_dataset_estimate;
 }
 
 } // namespace duckdb

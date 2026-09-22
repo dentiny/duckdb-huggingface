@@ -2,6 +2,7 @@
 
 #include "huggingface_common.hpp"
 #include "huggingface_extension.hpp"
+#include "huggingface_functions.hpp"
 
 #include "cache_httpfs_config.hpp"
 #include "cache_httpfs_extension.hpp"
@@ -42,10 +43,7 @@ void DisablePersistentCache(ExtensionLoader &loader) {
 void LoadInternal(ExtensionLoader &loader) {
 	EnsureCacheHttpfsExtensionLoaded(loader);
 	DisablePersistentCache(loader);
-	RegisterHFFiles(loader);
-	RegisterHFScan(loader);
-	RegisterHFProfile(loader);
-	RegisterHFBlobSize(loader);
+	RegisterHuggingFaceFunctions(loader);
 }
 
 } // namespace
