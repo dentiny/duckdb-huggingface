@@ -1,4 +1,5 @@
 #include "huggingface_common.hpp"
+#include "huggingface_functions.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
@@ -32,14 +33,14 @@ unique_ptr<TableRef> HFProfileBindReplace(ClientContext &context, TableFunctionB
 
 } // namespace
 
-void RegisterHFProfile(ExtensionLoader &loader) {
+TableFunction GetHFProfileFunction() {
 	TableFunction function("hf_profile", {LogicalType::VARCHAR}, nullptr, nullptr);
 	function.named_parameters["revision"] = LogicalType::VARCHAR;
 	function.named_parameters["config"] = LogicalType::VARCHAR;
 	function.named_parameters["split"] = LogicalType::VARCHAR;
 	function.named_parameters["path"] = LogicalType::VARCHAR;
 	function.bind_replace = HFProfileBindReplace;
-	loader.RegisterFunction(function);
+	return function;
 }
 
 } // namespace duckdb

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.2
+
+### Added
+
+- Added descriptions, examples, categories, and parameter names to `duckdb_functions()` for all Hugging Face
+  functions.
+
 ## v0.1.1
 
 ### Fixed

@@ -1,4 +1,5 @@
 #include "huggingface_common.hpp"
+#include "huggingface_functions.hpp"
 #include "duckdb/parser/expression/constant_expression.hpp"
 #include "duckdb/parser/expression/function_expression.hpp"
 #include "duckdb/parser/tableref/table_function_ref.hpp"
@@ -35,7 +36,7 @@ unique_ptr<TableRef> HFScanBindReplace(ClientContext &context, TableFunctionBind
 
 } // namespace
 
-void RegisterHFScan(ExtensionLoader &loader) {
+TableFunction GetHFScanFunction() {
 	TableFunction function("hf_scan", {LogicalType::VARCHAR}, nullptr, nullptr);
 	function.named_parameters["revision"] = LogicalType::VARCHAR;
 	function.named_parameters["config"] = LogicalType::VARCHAR;
@@ -44,7 +45,7 @@ void RegisterHFScan(ExtensionLoader &loader) {
 	function.named_parameters["union_by_name"] = LogicalType::BOOLEAN;
 	function.named_parameters["filename"] = LogicalType::BOOLEAN;
 	function.bind_replace = HFScanBindReplace;
-	loader.RegisterFunction(function);
+	return function;
 }
 
 } // namespace duckdb

@@ -1,0 +1,22 @@
+# name: test/sql/huggingface_metadata.test
+# description: test catalog metadata for Hugging Face functions
+# group: [sql]
+
+require huggingface
+
+query I
+SELECT count(*)
+FROM duckdb_functions()
+WHERE function_name IN (
+    'hf_dataset_estimate',
+    'hf_files',
+    'hf_profile',
+    'hf_scan',
+    'huggingface_internal_blob_size'
+)
+AND description IS NOT NULL
+AND length(examples) > 0
+AND length(categories) > 0
+AND parameters[1] IN ('repository', 'url');
+----
+5

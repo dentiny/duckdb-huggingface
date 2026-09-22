@@ -16,9 +16,4 @@ struct HuggingFaceOptions {
 	string Pattern() const;
 };
 
-void RegisterHFFiles(ExtensionLoader &loader);
-void RegisterHFScan(ExtensionLoader &loader);
-void RegisterHFProfile(ExtensionLoader &loader);
-void RegisterHFBlobSize(ExtensionLoader &loader);
-
 } // namespace duckdb

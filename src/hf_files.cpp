@@ -1,4 +1,5 @@
 #include "huggingface_common.hpp"
+#include "huggingface_functions.hpp"
 
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/string_util.hpp"
@@ -194,7 +195,7 @@ unique_ptr<TableRef> HFFilesBindReplace(ClientContext &context, TableFunctionBin
 
 } // namespace
 
-void RegisterHFFiles(ExtensionLoader &loader) {
+TableFunction GetHFFilesFunction() {
 	TableFunction function("hf_files", {LogicalType::VARCHAR}, nullptr, nullptr);
 	function.named_parameters["revision"] = LogicalType::VARCHAR;
 	function.named_parameters["config"] = LogicalType::VARCHAR;
@@ -203,7 +204,7 @@ void RegisterHFFiles(ExtensionLoader &loader) {
 	function.named_parameters["blob_column"] = LogicalType::VARCHAR;
 	function.named_parameters["blob_concurrency"] = LogicalType::BIGINT;
 	function.bind_replace = HFFilesBindReplace;
-	loader.RegisterFunction(function);
+	return function;
 }
 
 } // namespace duckdb
