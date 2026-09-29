@@ -2,6 +2,10 @@
 
 ## v0.1.2
 
+### Changed
+
+- Update DuckDB and extension-ci-tools to `v1.5.6` and synchronize the embedded cache_httpfs dependency.
+
 ### Added
 
 - Added descriptions, examples, categories, and parameter names to `duckdb_functions()` for all Hugging Face
