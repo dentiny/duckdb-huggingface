@@ -5,6 +5,7 @@
 ### Changed
 
 - Update DuckDB and extension-ci-tools to `v1.5.6`.
+- Update cache_httpfs to use DuckDB `v1.5.6` and its matching httpfs dependency.
 
 ### Added
 
