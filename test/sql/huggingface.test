@@ -29,6 +29,25 @@ SELECT cache_httpfs_get_ondisk_data_cache_size();
 ----
 0
 
+# Blob-size output keeps row counts and NULLs for local files without network access.
+statement ok
+COPY (SELECT 'hello') TO '{TEST_DIR}/hf_blob_size.txt' (FORMAT CSV, HEADER false);
+
+query I
+SELECT huggingface_internal_blob_size(path, 2)
+FROM (VALUES
+    (1, '{TEST_DIR}/hf_blob_size.txt'),
+    (2, '{TEST_DIR}/hf_blob_size_missing.txt'),
+    (3, '{TEST_DIR}/hf_blob_size.txt'),
+    (4, NULL)
+) AS paths(row_id, path)
+ORDER BY row_id;
+----
+6
+NULL
+6
+NULL
+
 statement error
 SELECT * FROM hf_files('invalid-repository-name');
 ----

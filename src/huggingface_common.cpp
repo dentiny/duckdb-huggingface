@@ -58,7 +58,7 @@ string GetNamedString(const TableFunctionBindInput &input, const Identifier &nam
 }
 
 unique_ptr<TableRef> ParseHuggingFaceQuery(ClientContext &context, const string &query) {
-	Parser parser(context.GetParserOptions());
+	Parser parser(context);
 	parser.ParseQuery(query);
 	auto statement = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(parser.statements[0]));
 	return make_uniq<SubqueryRef>(std::move(statement));
