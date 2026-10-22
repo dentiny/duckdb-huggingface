@@ -7,7 +7,9 @@
 
 namespace duckdb {
 
+//! Read a named string parameter, using default_value when it is absent or NULL.
 string GetNamedString(const TableFunctionBindInput &input, const Identifier &name, const string &default_value = "");
+//! Parse generated SELECT SQL into a subquery table reference for bind replacement.
 unique_ptr<TableRef> ParseHuggingFaceQuery(ClientContext &context, const string &query);
 
 struct HuggingFaceOptions {
