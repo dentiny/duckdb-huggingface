@@ -20,3 +20,18 @@ AND length(categories) > 0
 AND parameters[1] IN ('repository', 'url');
 ----
 5
+
+query I
+SELECT count(*)
+FROM duckdb_functions()
+WHERE (function_name = 'hf_scan' AND list_sort(parameters) =
+       list_sort(['repository', 'revision', 'config', 'split', 'path', 'union_by_name', 'filename']))
+   OR (function_name = 'hf_profile' AND list_sort(parameters) =
+       list_sort(['repository', 'revision', 'config', 'split', 'path']))
+   OR (function_name = 'hf_files' AND list_sort(parameters) =
+       list_sort(['repository', 'revision', 'config', 'split', 'path', 'blob_column', 'blob_concurrency']))
+   OR (function_name = 'hf_dataset_estimate' AND list_sort(parameters) =
+       list_sort(['repository', 'revision', 'config', 'split', 'path', 'blob_column', 'blob_hash_column',
+                  'row_sample_size', 'blob_concurrency']));
+----
+4

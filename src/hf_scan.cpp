@@ -38,12 +38,14 @@ unique_ptr<TableRef> HFScanBindReplace(ClientContext &context, TableFunctionBind
 
 TableFunction GetHFScanFunction() {
 	TableFunction function("hf_scan", {LogicalType::VARCHAR}, nullptr, nullptr);
-	function.named_parameters["revision"] = LogicalType::VARCHAR;
-	function.named_parameters["config"] = LogicalType::VARCHAR;
-	function.named_parameters["split"] = LogicalType::VARCHAR;
-	function.named_parameters["path"] = LogicalType::VARCHAR;
-	function.named_parameters["union_by_name"] = LogicalType::BOOLEAN;
-	function.named_parameters["filename"] = LogicalType::BOOLEAN;
+	function.GetSignature().WithTypedKwargs("options", [](TypedKwargs &options) {
+		options.Add("revision", LogicalType::VARCHAR);
+		options.Add("config", LogicalType::VARCHAR);
+		options.Add("split", LogicalType::VARCHAR);
+		options.Add("path", LogicalType::VARCHAR);
+		options.Add("union_by_name", LogicalType::BOOLEAN);
+		options.Add("filename", LogicalType::BOOLEAN);
+	});
 	function.bind_replace = HFScanBindReplace;
 	return function;
 }

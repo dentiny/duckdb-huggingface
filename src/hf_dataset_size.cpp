@@ -239,14 +239,16 @@ ScalarFunction GetHFBlobSizeFunction() {
 
 TableFunction GetHFDatasetEstimateFunction() {
 	TableFunction hf_dataset_estimate("hf_dataset_estimate", {LogicalType::VARCHAR}, nullptr, nullptr);
-	hf_dataset_estimate.named_parameters["revision"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["config"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["split"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["path"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["blob_column"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["blob_hash_column"] = LogicalType::VARCHAR;
-	hf_dataset_estimate.named_parameters["row_sample_size"] = LogicalType::BIGINT;
-	hf_dataset_estimate.named_parameters["blob_concurrency"] = LogicalType::BIGINT;
+	hf_dataset_estimate.GetSignature().WithTypedKwargs("options", [](TypedKwargs &options) {
+		options.Add("revision", LogicalType::VARCHAR);
+		options.Add("config", LogicalType::VARCHAR);
+		options.Add("split", LogicalType::VARCHAR);
+		options.Add("path", LogicalType::VARCHAR);
+		options.Add("blob_column", LogicalType::VARCHAR);
+		options.Add("blob_hash_column", LogicalType::VARCHAR);
+		options.Add("row_sample_size", LogicalType::BIGINT);
+		options.Add("blob_concurrency", LogicalType::BIGINT);
+	});
 	hf_dataset_estimate.bind_replace = HFDatasetEstimateBindReplace;
 	return hf_dataset_estimate;
 }

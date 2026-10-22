@@ -20,6 +20,9 @@ FunctionDescription CreateDescription(vector<string> parameter_names, string des
 
 void RegisterScalarFunction(ExtensionLoader &loader, ScalarFunction function, vector<string> parameter_names,
                             string description, vector<string> examples, vector<string> categories) {
+	for (idx_t index = 0; index < parameter_names.size(); index++) {
+		function.GetSignature().GetParameter(index).SetName(Identifier(parameter_names[index]));
+	}
 	CreateScalarFunctionInfo info(std::move(function));
 	info.on_conflict = OnCreateConflict::ALTER_ON_CONFLICT;
 	info.descriptions.push_back(CreateDescription(std::move(parameter_names), std::move(description),
@@ -29,8 +32,14 @@ void RegisterScalarFunction(ExtensionLoader &loader, ScalarFunction function, ve
 
 void RegisterTableFunction(ExtensionLoader &loader, TableFunction function, vector<string> positional_parameter_names,
                            string description, vector<string> examples, vector<string> categories) {
-	for (const auto &parameter : function.named_parameters) {
-		positional_parameter_names.push_back(parameter.first.GetIdentifierName());
+	for (idx_t index = 0; index < positional_parameter_names.size(); index++) {
+		function.GetSignature().GetParameter(index).SetName(Identifier(positional_parameter_names[index]));
+	}
+	const auto options = function.GetSignature().GetTypedKwargs();
+	if (options) {
+		for (const auto &option : options->GetOptions()) {
+			positional_parameter_names.push_back(option.name.GetIdentifierName());
+		}
 	}
 
 	CreateTableFunctionInfo info(std::move(function));

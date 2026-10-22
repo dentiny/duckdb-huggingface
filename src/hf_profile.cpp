@@ -25,10 +25,12 @@ unique_ptr<TableRef> HFProfileBindReplace(ClientContext &context, TableFunctionB
 
 TableFunction GetHFProfileFunction() {
 	TableFunction function("hf_profile", {LogicalType::VARCHAR}, nullptr, nullptr);
-	function.named_parameters["revision"] = LogicalType::VARCHAR;
-	function.named_parameters["config"] = LogicalType::VARCHAR;
-	function.named_parameters["split"] = LogicalType::VARCHAR;
-	function.named_parameters["path"] = LogicalType::VARCHAR;
+	function.GetSignature().WithTypedKwargs("options", [](TypedKwargs &options) {
+		options.Add("revision", LogicalType::VARCHAR);
+		options.Add("config", LogicalType::VARCHAR);
+		options.Add("split", LogicalType::VARCHAR);
+		options.Add("path", LogicalType::VARCHAR);
+	});
 	function.bind_replace = HFProfileBindReplace;
 	return function;
 }
