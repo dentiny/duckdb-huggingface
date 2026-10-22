@@ -2,6 +2,11 @@
 
 ## v0.2.0
 
+### Fixed
+
+- Register optional function arguments through DuckDB v2 typed kwargs and read their descriptions from the function signature.
+- Preserve positional argument names in `duckdb_functions()` using the native signature metadata.
+
 ### Changed
 
 - Upgrade DuckDB to `v2.0.0`, synchronize extension-ci-tools, and update the embedded cache_httpfs/httpfs dependencies.

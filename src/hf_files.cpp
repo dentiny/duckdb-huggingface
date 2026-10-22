@@ -165,12 +165,14 @@ unique_ptr<TableRef> HFFilesBindReplace(ClientContext &context, TableFunctionBin
 
 TableFunction GetHFFilesFunction() {
 	TableFunction function("hf_files", {LogicalType::VARCHAR}, nullptr, nullptr);
-	function.named_parameters["revision"] = LogicalType::VARCHAR;
-	function.named_parameters["config"] = LogicalType::VARCHAR;
-	function.named_parameters["split"] = LogicalType::VARCHAR;
-	function.named_parameters["path"] = LogicalType::VARCHAR;
-	function.named_parameters["blob_column"] = LogicalType::VARCHAR;
-	function.named_parameters["blob_concurrency"] = LogicalType::BIGINT;
+	function.GetSignature().WithTypedKwargs("options", [](TypedKwargs &options) {
+		options.Add("revision", LogicalType::VARCHAR);
+		options.Add("config", LogicalType::VARCHAR);
+		options.Add("split", LogicalType::VARCHAR);
+		options.Add("path", LogicalType::VARCHAR);
+		options.Add("blob_column", LogicalType::VARCHAR);
+		options.Add("blob_concurrency", LogicalType::BIGINT);
+	});
 	function.bind_replace = HFFilesBindReplace;
 	return function;
 }
