@@ -30,7 +30,7 @@ void RegisterScalarFunction(ExtensionLoader &loader, ScalarFunction function, ve
 void RegisterTableFunction(ExtensionLoader &loader, TableFunction function, vector<string> positional_parameter_names,
                            string description, vector<string> examples, vector<string> categories) {
 	for (const auto &parameter : function.named_parameters) {
-		positional_parameter_names.push_back(parameter.first);
+		positional_parameter_names.push_back(parameter.first.GetIdentifierName());
 	}
 
 	CreateTableFunctionInfo info(std::move(function));

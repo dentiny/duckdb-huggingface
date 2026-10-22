@@ -3,10 +3,7 @@
 
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/string_util.hpp"
-#include "duckdb/parser/keyword_helper.hpp"
-#include "duckdb/parser/parser.hpp"
-#include "duckdb/parser/statement/select_statement.hpp"
-#include "duckdb/parser/tableref/subqueryref.hpp"
+#include "duckdb/common/sql_identifier.hpp"
 
 #include <algorithm>
 
@@ -24,22 +21,6 @@ struct HuggingFaceFile {
 	idx_t parquet_size_bytes;
 };
 
-vector<string> SplitPath(const string &path) {
-	vector<string> result;
-	idx_t start = 0;
-	while (start < path.size()) {
-		auto end = path.find('/', start);
-		if (end == string::npos) {
-			end = path.size();
-		}
-		if (end > start) {
-			result.push_back(path.substr(start, end - start));
-		}
-		start = end + 1;
-	}
-	return result;
-}
-
 void InferConfigAndSplit(const string &file_path, const string &repository, string &config, string &split) {
 	auto repository_position = file_path.find(repository);
 	if (repository_position == string::npos) {
@@ -49,7 +30,8 @@ void InferConfigAndSplit(const string &file_path, const string &repository, stri
 	if (path_position == string::npos) {
 		return;
 	}
-	auto components = SplitPath(file_path.substr(path_position + 1));
+	auto components = StringUtil::Split(file_path.substr(path_position + 1), '/');
+	components.erase(std::remove(components.begin(), components.end(), ""), components.end());
 	if (components.size() >= 2) {
 		config = components[0];
 		split = components[1];
@@ -88,14 +70,6 @@ vector<HuggingFaceFile> GlobFiles(ClientContext &context, const TableFunctionBin
 	return result;
 }
 
-string GetNamedString(const TableFunctionBindInput &input, const string &name) {
-	auto entry = input.named_parameters.find(name);
-	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
-		return "";
-	}
-	return entry->second.GetValue<string>();
-}
-
 idx_t GetBlobConcurrency(const TableFunctionBindInput &input) {
 	auto entry = input.named_parameters.find("blob_concurrency");
 	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
@@ -106,13 +80,6 @@ idx_t GetBlobConcurrency(const TableFunctionBindInput &input) {
 		throw InvalidInputException("blob_concurrency must be between 1 and 256");
 	}
 	return NumericCast<idx_t>(concurrency);
-}
-
-unique_ptr<TableRef> ParseFilesQuery(ClientContext &context, const string &query) {
-	Parser parser(context.GetParserOptions());
-	parser.ParseQuery(query);
-	auto statement = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(parser.statements[0]));
-	return make_uniq<SubqueryRef>(std::move(statement));
 }
 
 string BuildFilesValues(const vector<HuggingFaceFile> &files) {
@@ -136,7 +103,7 @@ string BuildParquetOnlyQuery(const string &file_values) {
 	    file_values);
 }
 
-string BuildBlobQuery(const string &file_values, const string &file_paths, const string &blob_column,
+string BuildBlobQuery(const string &file_values, const string &file_paths, const Identifier &blob_column,
                       idx_t blob_concurrency) {
 	return StringUtil::Format(
 	    "WITH files(repository, revision, config, split, file_index, path, parquet_size_bytes) AS (VALUES %s), "
@@ -172,16 +139,16 @@ string BuildBlobQuery(const string &file_values, const string &file_paths, const
 	    "FROM files LEFT JOIN parquet_sizes USING (path) LEFT JOIN logical_stats USING (path) "
 	    "LEFT JOIN physical_stats USING (path) "
 	    "ORDER BY files.file_index",
-	    file_values, KeywordHelper::WriteQuoted(blob_column, '"'), file_paths,
+	    file_values, SQLQuotedIdentifier::ToString(blob_column), file_paths,
 	    Value::UBIGINT(blob_concurrency).ToSQLString(), Value::UBIGINT(blob_concurrency).ToSQLString());
 }
 
 unique_ptr<TableRef> HFFilesBindReplace(ClientContext &context, TableFunctionBindInput &input) {
-	auto blob_column = GetNamedString(input, "blob_column");
+	const Identifier blob_column(GetNamedString(input, "blob_column"));
 	auto files = GlobFiles(context, input, blob_column.empty());
 	auto file_values = BuildFilesValues(files);
 	if (blob_column.empty()) {
-		return ParseFilesQuery(context, BuildParquetOnlyQuery(file_values));
+		return ParseHuggingFaceQuery(context, BuildParquetOnlyQuery(file_values));
 	}
 
 	vector<Value> paths;
@@ -190,7 +157,8 @@ unique_ptr<TableRef> HFFilesBindReplace(ClientContext &context, TableFunctionBin
 		paths.emplace_back(file.path);
 	}
 	auto file_paths = Value::LIST(LogicalType::VARCHAR, std::move(paths)).ToSQLString();
-	return ParseFilesQuery(context, BuildBlobQuery(file_values, file_paths, blob_column, GetBlobConcurrency(input)));
+	return ParseHuggingFaceQuery(context,
+	                             BuildBlobQuery(file_values, file_paths, blob_column, GetBlobConcurrency(input)));
 }
 
 } // namespace
