@@ -8,7 +8,7 @@ namespace duckdb {
 
 namespace {
 
-bool GetNamedBoolean(const TableFunctionBindInput &input, const string &name, bool default_value) {
+bool GetNamedBoolean(const TableFunctionBindInput &input, const Identifier &name, bool default_value) {
 	auto entry = input.named_parameters.find(name);
 	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
 		return default_value;
@@ -30,8 +30,8 @@ unique_ptr<TableRef> HFScanBindReplace(ClientContext &context, TableFunctionBind
 	arguments.push_back(std::move(filename));
 
 	auto result = make_uniq<TableFunctionRef>();
-	result->function = make_uniq<FunctionExpression>("parquet_scan", std::move(arguments));
-	return std::move(result);
+	result->function = make_uniq<FunctionExpression>(Identifier("parquet_scan"), std::move(arguments));
+	return result;
 }
 
 } // namespace

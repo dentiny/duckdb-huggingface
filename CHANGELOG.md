@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.0
+
+### Changed
+
+- Upgrade DuckDB to `v2.0.0`, synchronize extension-ci-tools, and update the embedded cache_httpfs/httpfs dependencies.
+- Use DuckDB identifiers and SQL quoting APIs for function parameters and column names.
+- Share bind-replacement parsing and named-argument helpers, and avoid copies while trimming paths.
+- Record extension versions and static dependencies in the build configuration.
+
 ## v0.1.2
 
 ### Changed

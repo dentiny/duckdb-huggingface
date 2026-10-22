@@ -1,20 +1,10 @@
 #include "huggingface_common.hpp"
 #include "huggingface_functions.hpp"
 #include "duckdb/common/string_util.hpp"
-#include "duckdb/parser/parser.hpp"
-#include "duckdb/parser/statement/select_statement.hpp"
-#include "duckdb/parser/tableref/subqueryref.hpp"
 
 namespace duckdb {
 
 namespace {
-
-unique_ptr<TableRef> ParseProfileQuery(ClientContext &context, const string &query) {
-	Parser parser(context.GetParserOptions());
-	parser.ParseQuery(query);
-	auto statement = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(parser.statements[0]));
-	return make_uniq<SubqueryRef>(std::move(statement));
-}
 
 unique_ptr<TableRef> HFProfileBindReplace(ClientContext &context, TableFunctionBindInput &input) {
 	auto options = HuggingFaceOptions::Parse(input);
@@ -28,7 +18,7 @@ unique_ptr<TableRef> HFProfileBindReplace(ClientContext &context, TableFunctionB
 	                                Value(options.repository).ToSQLString(), Value(options.revision).ToSQLString(),
 	                                Value(config).ToSQLString(), Value(split).ToSQLString(),
 	                                Value(options.Pattern()).ToSQLString());
-	return ParseProfileQuery(context, query);
+	return ParseHuggingFaceQuery(context, query);
 }
 
 } // namespace

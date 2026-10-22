@@ -4,10 +4,7 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/string_util.hpp"
-#include "duckdb/parser/keyword_helper.hpp"
-#include "duckdb/parser/parser.hpp"
-#include "duckdb/parser/statement/select_statement.hpp"
-#include "duckdb/parser/tableref/subqueryref.hpp"
+#include "duckdb/common/sql_identifier.hpp"
 
 #include <atomic>
 #include <thread>
@@ -21,7 +18,7 @@ constexpr idx_t MAX_BLOB_CONCURRENCY = 256;
 constexpr idx_t DEFAULT_ROW_SAMPLE_SIZE = 100;
 constexpr idx_t MAX_ROW_SAMPLE_SIZE = 100000;
 
-string GetBlobColumn(const TableFunctionBindInput &input) {
+Identifier GetBlobColumn(const TableFunctionBindInput &input) {
 	auto entry = input.named_parameters.find("blob_column");
 	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
 		return "images";
@@ -30,7 +27,7 @@ string GetBlobColumn(const TableFunctionBindInput &input) {
 	if (column.empty()) {
 		throw InvalidInputException("blob_column cannot be empty");
 	}
-	return column;
+	return Identifier(std::move(column));
 }
 
 idx_t GetBlobConcurrency(const TableFunctionBindInput &input) {
@@ -45,12 +42,12 @@ idx_t GetBlobConcurrency(const TableFunctionBindInput &input) {
 	return NumericCast<idx_t>(concurrency);
 }
 
-string GetBlobHashColumn(const TableFunctionBindInput &input) {
+Identifier GetBlobHashColumn(const TableFunctionBindInput &input) {
 	auto entry = input.named_parameters.find("blob_hash_column");
 	if (entry == input.named_parameters.end() || entry->second.IsNull()) {
 		return "";
 	}
-	return entry->second.GetValue<string>();
+	return Identifier(entry->second.GetValue<string>());
 }
 
 idx_t GetRowSampleSize(const TableFunctionBindInput &input) {
@@ -65,16 +62,9 @@ idx_t GetRowSampleSize(const TableFunctionBindInput &input) {
 	return NumericCast<idx_t>(sample_size);
 }
 
-unique_ptr<TableRef> ParseDatasetSizeQuery(ClientContext &context, const string &query) {
-	Parser parser(context.GetParserOptions());
-	parser.ParseQuery(query);
-	auto statement = unique_ptr_cast<SQLStatement, SelectStatement>(std::move(parser.statements[0]));
-	return make_uniq<SubqueryRef>(std::move(statement));
-}
-
-string BuildSampleQuery(const string &files, const string &blob_column, const string &blob_hash_column,
+string BuildSampleQuery(const string &files, const Identifier &blob_column, const Identifier &blob_hash_column,
                         idx_t row_sample_size) {
-	auto quoted_blob_column = KeywordHelper::WriteQuoted(blob_column, '"');
+	auto quoted_blob_column = SQLQuotedIdentifier::ToString(blob_column);
 	if (blob_hash_column.empty()) {
 		return StringUtil::Format("sampled_rows AS MATERIALIZED ("
 		                          "SELECT %s FROM parquet_scan(%s) LIMIT %s"
@@ -119,15 +109,15 @@ string BuildSampleQuery(const string &files, const string &blob_column, const st
 	                          "), sample_urls AS MATERIALIZED ("
 	                          "SELECT any_value(url) AS url FROM blob_sample GROUP BY blob_id"
 	                          ")",
-	                          quoted_blob_column, KeywordHelper::WriteQuoted(blob_hash_column, '"'), files,
+	                          quoted_blob_column, SQLQuotedIdentifier::ToString(blob_hash_column), files,
 	                          Value::UBIGINT(row_sample_size).ToSQLString(), quoted_blob_column,
-	                          KeywordHelper::WriteQuoted(blob_hash_column, '"'),
+	                          SQLQuotedIdentifier::ToString(blob_hash_column),
 	                          Value::UBIGINT(row_sample_size).ToSQLString());
 }
 
 string BuildDatasetEstimateQuery(const HuggingFaceOptions &options, const string &sampled_files,
-                                 idx_t parquet_file_count, const string &blob_column, const string &blob_hash_column,
-                                 idx_t row_sample_size, idx_t blob_concurrency) {
+                                 idx_t parquet_file_count, const Identifier &blob_column,
+                                 const Identifier &blob_hash_column, idx_t row_sample_size, idx_t blob_concurrency) {
 	auto sample_query = BuildSampleQuery(sampled_files, blob_column, blob_hash_column, row_sample_size);
 	return StringUtil::Format(
 	    "WITH %s, sampled_file AS MATERIALIZED ("
@@ -181,7 +171,7 @@ unique_ptr<TableRef> HFDatasetEstimateBindReplace(ClientContext &context, TableF
 	auto query =
 	    BuildDatasetEstimateQuery(options, sampled_files, matches.size(), GetBlobColumn(input),
 	                              GetBlobHashColumn(input), GetRowSampleSize(input), GetBlobConcurrency(input));
-	return ParseDatasetSizeQuery(context, query);
+	return ParseHuggingFaceQuery(context, query);
 }
 
 void HFBlobSizeFunction(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -190,7 +180,7 @@ void HFBlobSizeFunction(DataChunk &args, ExpressionState &state, Vector &result)
 	concurrency = MinValue<uint64_t>(concurrency, count);
 
 	UnifiedVectorFormat input_data;
-	args.data[0].ToUnifiedFormat(count, input_data);
+	args.data[0].ToUnifiedFormat(input_data);
 	auto input_urls = UnifiedVectorFormat::GetData<string_t>(input_data);
 	vector<int64_t> sizes(count);
 	vector<uint8_t> resolved(count, 0);

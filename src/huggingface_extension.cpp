@@ -8,24 +8,25 @@
 #include "cache_httpfs_extension.hpp"
 #include "duckdb/main/extension_install_info.hpp"
 #include "duckdb/main/extension_manager.hpp"
+#include <string_view>
 
 namespace duckdb {
 
 namespace {
 
-constexpr const char *CACHE_HTTPFS_EXTENSION = "cache_httpfs";
+constexpr std::string_view CACHE_HTTPFS_EXTENSION = "cache_httpfs";
 
 // huggingface extension set cache_httpfs extension attributes, so need to ensure it is loaded first.
 void EnsureCacheHttpfsExtensionLoaded(ExtensionLoader &loader) {
 	auto &instance = loader.GetDatabaseInstance();
 	auto &extension_manager = ExtensionManager::Get(instance);
-	if (extension_manager.ExtensionIsLoaded(CACHE_HTTPFS_EXTENSION)) {
+	if (extension_manager.ExtensionIsLoaded(string(CACHE_HTTPFS_EXTENSION))) {
 		return;
 	}
 
 	CacheHttpfsExtension().Load(loader);
 
-	auto extension_active_load = extension_manager.BeginLoad(CACHE_HTTPFS_EXTENSION);
+	auto extension_active_load = extension_manager.BeginLoad(ExtensionLoadOptions(string(CACHE_HTTPFS_EXTENSION)));
 	if (!extension_active_load) {
 		return;
 	}

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 # Set extension name here
 set(TARGET_NAME huggingface)
@@ -31,6 +31,8 @@ set(EXTENSION_SOURCES
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
+target_compile_features(${EXTENSION_NAME} PUBLIC cxx_std_17)
+target_compile_features(${LOADABLE_EXTENSION_NAME} PUBLIC cxx_std_17)
 target_link_libraries(${EXTENSION_NAME} cache_httpfs_extension)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} cache_httpfs_extension)
 
