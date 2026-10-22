@@ -219,14 +219,8 @@ void HFBlobSizeFunction(DataChunk &args, ExpressionState &state, Vector &result)
 	}
 
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto output = FlatVector::GetData<int64_t>(result);
-	auto &validity = FlatVector::Validity(result);
 	for (idx_t row_index = 0; row_index < count; row_index++) {
-		if (resolved[row_index]) {
-			output[row_index] = sizes[row_index];
-		} else {
-			validity.SetInvalid(row_index);
-		}
+		result.Append(resolved[row_index] ? Value::BIGINT(sizes[row_index]) : Value(LogicalType::BIGINT));
 	}
 }
 

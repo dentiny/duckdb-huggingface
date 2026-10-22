@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Use the public parser constructor and literal factories, and append blob-size results with correct row counts and NULL validity on DuckDB v2.
 - Register optional function arguments through DuckDB v2 typed kwargs and read their descriptions from the function signature.
 - Preserve positional argument names in `duckdb_functions()` using the native signature metadata.
 

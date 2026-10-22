@@ -19,13 +19,13 @@ bool GetNamedBoolean(const TableFunctionBindInput &input, const Identifier &name
 unique_ptr<TableRef> HFScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {
 	auto pattern = HuggingFaceOptions::Parse(input).Pattern();
 	vector<unique_ptr<ParsedExpression>> arguments;
-	arguments.push_back(make_uniq<ConstantExpression>(Value(pattern)));
+	arguments.push_back(ConstantExpression::String(std::move(pattern)));
 
-	auto union_by_name = make_uniq<ConstantExpression>(Value::BOOLEAN(GetNamedBoolean(input, "union_by_name", true)));
+	auto union_by_name = ConstantExpression::Boolean(GetNamedBoolean(input, "union_by_name", true));
 	union_by_name->SetAlias("union_by_name");
 	arguments.push_back(std::move(union_by_name));
 
-	auto filename = make_uniq<ConstantExpression>(Value::BOOLEAN(GetNamedBoolean(input, "filename", false)));
+	auto filename = ConstantExpression::Boolean(GetNamedBoolean(input, "filename", false));
 	filename->SetAlias("filename");
 	arguments.push_back(std::move(filename));
 
