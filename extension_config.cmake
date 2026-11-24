@@ -7,5 +7,5 @@ duckdb_extension_load(
 duckdb_extension_statically_link(cache_httpfs)
 
 duckdb_extension_load(huggingface SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
-                      EXTENSION_VERSION 0.2.0 LOAD_TESTS)
+                      EXTENSION_VERSION 0.2.1 LOAD_TESTS)
 duckdb_extension_statically_link(huggingface)
